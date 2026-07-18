@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>Tic Tac Toe</title>
+<title>Vanishing Tic Tac Toe</title>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -18,14 +18,22 @@
   }
   h1 {
     margin-bottom: 4px;
-    font-size: 28px;
-    letter-spacing: 2px;
+    font-size: 26px;
+    letter-spacing: 1px;
     color: #7CFC00;
+    text-align: center;
+  }
+  #subtitle {
+    font-size: 13px;
+    color: #999;
+    margin-bottom: 14px;
+    text-align: center;
+    max-width: 320px;
   }
   #modeSelect {
     display: flex;
     gap: 10px;
-    margin: 14px 0;
+    margin-bottom: 14px;
   }
   .modeBtn {
     padding: 8px 16px;
@@ -44,6 +52,7 @@
     margin-bottom: 14px;
     font-size: 17px;
     min-height: 24px;
+    text-align: center;
   }
   #board {
     display: grid;
@@ -64,7 +73,7 @@
     font-weight: bold;
     cursor: pointer;
     user-select: none;
-    transition: background 0.15s;
+    transition: background 0.15s, opacity 0.2s;
   }
   .cell:hover {
     background: #16202c;
@@ -73,6 +82,14 @@
   .cell.o { color: #ff5555; }
   .cell.win {
     background: rgba(124, 252, 0, 0.15);
+  }
+  .cell.fading {
+    opacity: 0.35;
+    animation: pulse 1s infinite alternate;
+  }
+  @keyframes pulse {
+    from { opacity: 0.35; }
+    to { opacity: 0.65; }
   }
   #score {
     margin-top: 16px;
@@ -96,7 +113,8 @@
 </head>
 <body>
 
-<h1>⭕ TIC TAC TOE ❌</h1>
+<h1>👻 사라지는 틱택토</h1>
+<div id="subtitle">각자 말은 최대 3개까지! 4번째를 두면 자기 말 중 가장 오래된 게 사라져요. (흐릿하게 깜빡이는 말이 다음에 사라질 말이에요)</div>
 
 <div id="modeSelect">
   <button class="modeBtn active" data-mode="pvp">2인 플레이</button>
@@ -109,7 +127,6 @@
 <div id="score">
   <span>X 승: <span id="scoreX">0</span></span>
   <span>O 승: <span id="scoreO">0</span></span>
-  <span>무승부: <span id="scoreDraw">0</span></span>
 </div>
 
 <button id="resetBtn">다시 시작</button>
@@ -121,13 +138,13 @@ const resetBtn = document.getElementById('resetBtn');
 const modeBtns = document.querySelectorAll('.modeBtn');
 const scoreXEl = document.getElementById('scoreX');
 const scoreOEl = document.getElementById('scoreO');
-const scoreDrawEl = document.getElementById('scoreDraw');
 
 let cells = Array(9).fill(null);
+let playerMoves = { X: [], O: [] }; // 각 플레이어가 둔 순서대로 칸 번호 저장 (최대 3개)
 let currentPlayer = 'X';
 let gameActive = true;
-let mode = 'pvp'; // 'pvp' or 'cpu'
-let scores = { X: 0, O: 0, draw: 0 };
+let mode = 'pvp';
+let scores = { X: 0, O: 0 };
 
 const winPatterns = [
   [0,1,2],[3,4,5],[6,7,8],
@@ -150,7 +167,18 @@ function render() {
   const cellDivs = boardEl.children;
   cells.forEach((val, i) => {
     cellDivs[i].textContent = val || '';
-    cellDivs[i].className = 'cell' + (val === 'X' ? ' x' : val === 'O' ? ' o' : '');
+    let cls = 'cell';
+    if (val === 'X') cls += ' x';
+    if (val === 'O') cls += ' o';
+    cellDivs[i].className = cls;
+  });
+
+  // 다음에 사라질 말 표시 (각 플레이어가 이미 3개를 뒀을 때, 가장 오래된 말)
+  ['X', 'O'].forEach(player => {
+    if (playerMoves[player].length === 3) {
+      const fadingIndex = playerMoves[player][0];
+      cellDivs[fadingIndex].classList.add('fading');
+    }
   });
 }
 
@@ -161,7 +189,7 @@ function handleClick(i) {
   if (checkEnd()) return;
 
   currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-  statusEl.textContent = `${currentPlayer} 차례입니다`;
+  updateStatus();
 
   if (mode === 'cpu' && currentPlayer === 'O' && gameActive) {
     statusEl.textContent = '컴퓨터 생각 중...';
@@ -170,8 +198,19 @@ function handleClick(i) {
 }
 
 function makeMove(i, player) {
+  // 이미 3개를 뒀다면 가장 오래된 말 제거
+  if (playerMoves[player].length === 3) {
+    const oldest = playerMoves[player].shift();
+    cells[oldest] = null;
+  }
   cells[i] = player;
+  playerMoves[player].push(i);
   render();
+}
+
+function updateStatus() {
+  const willVanish = playerMoves[currentPlayer].length === 3;
+  statusEl.textContent = `${currentPlayer} 차례입니다` + (willVanish ? ' (이번 수를 두면 오래된 말이 사라져요)' : '');
 }
 
 function checkEnd() {
@@ -184,14 +223,8 @@ function checkEnd() {
     updateScore();
     return true;
   }
-  if (cells.every(c => c)) {
-    gameActive = false;
-    statusEl.textContent = '무승부입니다!';
-    scores.draw++;
-    updateScore();
-    return true;
-  }
   return false;
+  // 참고: 말이 계속 사라지고 다시 놓이는 방식이라 무승부(보드 꽉 참)는 사실상 발생하지 않음
 }
 
 function getWinner() {
@@ -212,7 +245,6 @@ function highlightWin(pattern) {
 function updateScore() {
   scoreXEl.textContent = scores.X;
   scoreOEl.textContent = scores.O;
-  scoreDrawEl.textContent = scores.draw;
 }
 
 // 간단한 CPU: 이길 수 있으면 이기고, 막아야 하면 막고, 아니면 랜덤
@@ -225,7 +257,7 @@ function cpuMove() {
   if (checkEnd()) return;
 
   currentPlayer = 'X';
-  statusEl.textContent = 'X 차례입니다';
+  updateStatus();
 }
 
 function findBestMove(player) {
@@ -249,11 +281,12 @@ function randomMove() {
 
 function resetGame() {
   cells = Array(9).fill(null);
+  playerMoves = { X: [], O: [] };
   currentPlayer = 'X';
   gameActive = true;
   buildBoard();
   render();
-  statusEl.textContent = 'X 차례입니다';
+  updateStatus();
 }
 
 resetBtn.addEventListener('click', resetGame);
@@ -269,6 +302,7 @@ modeBtns.forEach(btn => {
 
 buildBoard();
 render();
+updateStatus();
 </script>
 </body>
 </html>
