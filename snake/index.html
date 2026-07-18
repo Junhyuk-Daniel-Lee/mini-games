@@ -17,38 +17,38 @@
     color: #eee;
   }
   h1 {
-    margin-bottom: 8px;
-    font-size: 28px;
-    letter-spacing: 2px;
+    margin-bottom: 16px;
+    font-size: 56px;
+    letter-spacing: 4px;
     color: #7CFC00;
   }
   #info {
-    margin-bottom: 10px;
-    font-size: 16px;
+    margin-bottom: 20px;
+    font-size: 32px;
     display: flex;
-    gap: 24px;
+    gap: 48px;
   }
   #gameCanvas {
     background: #0a0f16;
-    border: 3px solid #7CFC00;
-    border-radius: 8px;
-    box-shadow: 0 0 20px rgba(124, 252, 0, 0.3);
+    border: 6px solid #7CFC00;
+    border-radius: 16px;
+    box-shadow: 0 0 40px rgba(124, 252, 0, 0.3);
   }
   #message {
-    margin-top: 12px;
-    font-size: 15px;
+    margin-top: 24px;
+    font-size: 30px;
     color: #aaa;
     text-align: center;
-    min-height: 20px;
+    min-height: 40px;
   }
   button {
-    margin-top: 10px;
-    padding: 8px 20px;
-    font-size: 15px;
+    margin-top: 20px;
+    padding: 16px 40px;
+    font-size: 30px;
     background: #7CFC00;
     color: #0a0f16;
     border: none;
-    border-radius: 6px;
+    border-radius: 12px;
     cursor: pointer;
     font-weight: bold;
   }
@@ -63,7 +63,7 @@
   <span>점수: <span id="score">0</span></span>
   <span>최고점수: <span id="highScore">0</span></span>
 </div>
-<canvas id="gameCanvas" width="400" height="400"></canvas>
+<canvas id="gameCanvas" width="800" height="800"></canvas>
 <div id="message">방향키 또는 스와이프로 조작하세요. 스페이스바로 시작!</div>
 <button id="restartBtn" class="hidden">다시 시작</button>
 
@@ -75,7 +75,7 @@ const highScoreEl = document.getElementById('highScore');
 const messageEl = document.getElementById('message');
 const restartBtn = document.getElementById('restartBtn');
 
-const gridSize = 20;
+const gridSize = 40;
 const tileCount = canvas.width / gridSize;
 
 let snake, dx, dy, food, score, gameRunning, gameLoop;
