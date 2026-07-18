@@ -90,7 +90,7 @@
     background: #16202c;
   }
   .cell.x { color: #ff5555; }
-  .cell.o { color: #7CFC00; }
+  .cell.o { color: #3b82f6; }
   .cell.win {
     background: rgba(124, 252, 0, 0.15);
   }
@@ -124,7 +124,7 @@
 </head>
 <body>
 
-<h1>👻 사라지는 틱택토</h1>
+<h1><span style="color:#3b82f6">O</span> 사라지는 틱택토 <span style="color:#ff5555">X</span></h1>
 <div id="subtitle">각자 말은 최대 3개까지! 4번째를 두면 자기 말 중 가장 오래된 게 사라져요.</div>
 
 <div class="settingGroup">
@@ -138,8 +138,8 @@
 <div class="settingGroup">
   <span class="settingLabel">내 기호</span>
   <div class="settingRow" id="symbolSelect">
-    <button class="optBtn active" data-symbol="O">⭕</button>
-    <button class="optBtn" data-symbol="X">❌</button>
+    <button class="optBtn active" data-symbol="O" style="color:#3b82f6">O</button>
+    <button class="optBtn" data-symbol="X" style="color:#ff5555">X</button>
   </div>
 </div>
 
