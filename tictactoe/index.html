@@ -2,8 +2,9 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<title>Mini Games</title>
+<title>Tic Tac Toe</title>
 <style>
+  * { box-sizing: border-box; }
   body {
     margin: 0;
     min-height: 100vh;
@@ -15,44 +16,259 @@
     font-family: 'Segoe UI', Arial, sans-serif;
     color: #eee;
   }
-  h1 { color: #7CFC00; margin-bottom: 30px; }
-  .games {
+  h1 {
+    margin-bottom: 4px;
+    font-size: 28px;
+    letter-spacing: 2px;
+    color: #7CFC00;
+  }
+  #modeSelect {
     display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-    max-width: 700px;
+    gap: 10px;
+    margin: 14px 0;
   }
-  .card {
+  .modeBtn {
+    padding: 8px 16px;
+    font-size: 14px;
     background: #16202c;
-    border: 2px solid #2a3a4a;
-    border-radius: 10px;
-    padding: 24px 30px;
-    text-align: center;
-    text-decoration: none;
     color: #eee;
-    transition: 0.2s;
-    width: 160px;
+    border: 2px solid #2a3a4a;
+    border-radius: 6px;
+    cursor: pointer;
   }
-  .card:hover {
+  .modeBtn.active {
     border-color: #7CFC00;
-    transform: translateY(-4px);
+    color: #7CFC00;
   }
-  .card .emoji { font-size: 40px; display: block; margin-bottom: 10px; }
+  #status {
+    margin-bottom: 14px;
+    font-size: 17px;
+    min-height: 24px;
+  }
+  #board {
+    display: grid;
+    grid-template-columns: repeat(3, 100px);
+    grid-template-rows: repeat(3, 100px);
+    gap: 6px;
+    background: #2a3a4a;
+    padding: 6px;
+    border-radius: 10px;
+  }
+  .cell {
+    background: #0a0f16;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 48px;
+    font-weight: bold;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+  }
+  .cell:hover {
+    background: #16202c;
+  }
+  .cell.x { color: #7CFC00; }
+  .cell.o { color: #ff5555; }
+  .cell.win {
+    background: rgba(124, 252, 0, 0.15);
+  }
+  #score {
+    margin-top: 16px;
+    display: flex;
+    gap: 24px;
+    font-size: 15px;
+  }
+  button#resetBtn {
+    margin-top: 14px;
+    padding: 8px 20px;
+    font-size: 15px;
+    background: #7CFC00;
+    color: #0a0f16;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  button#resetBtn:hover { background: #90ff20; }
 </style>
 </head>
 <body>
-  <h1>🎮 Mini Games</h1>
-  <div class="games">
-    <a class="card" href="snake/">
-      <span class="emoji">🐍</span>
-      Snake
-    </a>
-    <a class="card" href="tictactoe/">
-      <span class="emoji">⭕</span>
-      Tic Tac Toe
-    </a>
-    <!-- 다음 게임 추가 시 여기에 카드 추가 -->
-  </div>
+
+<h1>⭕ TIC TAC TOE ❌</h1>
+
+<div id="modeSelect">
+  <button class="modeBtn active" data-mode="pvp">2인 플레이</button>
+  <button class="modeBtn" data-mode="cpu">컴퓨터와 대전</button>
+</div>
+
+<div id="status">X 차례입니다</div>
+<div id="board"></div>
+
+<div id="score">
+  <span>X 승: <span id="scoreX">0</span></span>
+  <span>O 승: <span id="scoreO">0</span></span>
+  <span>무승부: <span id="scoreDraw">0</span></span>
+</div>
+
+<button id="resetBtn">다시 시작</button>
+
+<script>
+const boardEl = document.getElementById('board');
+const statusEl = document.getElementById('status');
+const resetBtn = document.getElementById('resetBtn');
+const modeBtns = document.querySelectorAll('.modeBtn');
+const scoreXEl = document.getElementById('scoreX');
+const scoreOEl = document.getElementById('scoreO');
+const scoreDrawEl = document.getElementById('scoreDraw');
+
+let cells = Array(9).fill(null);
+let currentPlayer = 'X';
+let gameActive = true;
+let mode = 'pvp'; // 'pvp' or 'cpu'
+let scores = { X: 0, O: 0, draw: 0 };
+
+const winPatterns = [
+  [0,1,2],[3,4,5],[6,7,8],
+  [0,3,6],[1,4,7],[2,5,8],
+  [0,4,8],[2,4,6]
+];
+
+function buildBoard() {
+  boardEl.innerHTML = '';
+  cells.forEach((val, i) => {
+    const cellDiv = document.createElement('div');
+    cellDiv.className = 'cell';
+    cellDiv.dataset.index = i;
+    cellDiv.addEventListener('click', () => handleClick(i));
+    boardEl.appendChild(cellDiv);
+  });
+}
+
+function render() {
+  const cellDivs = boardEl.children;
+  cells.forEach((val, i) => {
+    cellDivs[i].textContent = val || '';
+    cellDivs[i].className = 'cell' + (val === 'X' ? ' x' : val === 'O' ? ' o' : '');
+  });
+}
+
+function handleClick(i) {
+  if (!gameActive || cells[i]) return;
+  makeMove(i, currentPlayer);
+
+  if (checkEnd()) return;
+
+  currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+  statusEl.textContent = `${currentPlayer} 차례입니다`;
+
+  if (mode === 'cpu' && currentPlayer === 'O' && gameActive) {
+    statusEl.textContent = '컴퓨터 생각 중...';
+    setTimeout(cpuMove, 500);
+  }
+}
+
+function makeMove(i, player) {
+  cells[i] = player;
+  render();
+}
+
+function checkEnd() {
+  const winInfo = getWinner();
+  if (winInfo) {
+    gameActive = false;
+    highlightWin(winInfo.pattern);
+    statusEl.textContent = `🎉 ${winInfo.winner} 승리!`;
+    scores[winInfo.winner]++;
+    updateScore();
+    return true;
+  }
+  if (cells.every(c => c)) {
+    gameActive = false;
+    statusEl.textContent = '무승부입니다!';
+    scores.draw++;
+    updateScore();
+    return true;
+  }
+  return false;
+}
+
+function getWinner() {
+  for (const pattern of winPatterns) {
+    const [a,b,c] = pattern;
+    if (cells[a] && cells[a] === cells[b] && cells[a] === cells[c]) {
+      return { winner: cells[a], pattern };
+    }
+  }
+  return null;
+}
+
+function highlightWin(pattern) {
+  const cellDivs = boardEl.children;
+  pattern.forEach(i => cellDivs[i].classList.add('win'));
+}
+
+function updateScore() {
+  scoreXEl.textContent = scores.X;
+  scoreOEl.textContent = scores.O;
+  scoreDrawEl.textContent = scores.draw;
+}
+
+// 간단한 CPU: 이길 수 있으면 이기고, 막아야 하면 막고, 아니면 랜덤
+function cpuMove() {
+  if (!gameActive) return;
+
+  let move = findBestMove('O') ?? findBestMove('X') ?? randomMove();
+  makeMove(move, 'O');
+
+  if (checkEnd()) return;
+
+  currentPlayer = 'X';
+  statusEl.textContent = 'X 차례입니다';
+}
+
+function findBestMove(player) {
+  for (const pattern of winPatterns) {
+    const [a,b,c] = pattern;
+    const line = [cells[a], cells[b], cells[c]];
+    const idxs = [a,b,c];
+    const playerCount = line.filter(v => v === player).length;
+    const emptyIdx = idxs[line.findIndex(v => v === null)];
+    if (playerCount === 2 && line.includes(null)) {
+      return emptyIdx;
+    }
+  }
+  return null;
+}
+
+function randomMove() {
+  const empty = cells.map((v,i) => v === null ? i : null).filter(v => v !== null);
+  return empty[Math.floor(Math.random() * empty.length)];
+}
+
+function resetGame() {
+  cells = Array(9).fill(null);
+  currentPlayer = 'X';
+  gameActive = true;
+  buildBoard();
+  render();
+  statusEl.textContent = 'X 차례입니다';
+}
+
+resetBtn.addEventListener('click', resetGame);
+
+modeBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    modeBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    mode = btn.dataset.mode;
+    resetGame();
+  });
+});
+
+buildBoard();
+render();
+</script>
 </body>
 </html>
