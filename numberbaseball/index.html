@@ -60,7 +60,7 @@
     margin-bottom: 8px;
   }
   #guessInput {
-    width: 160px;
+    width: 260px;
     padding: 10px 12px;
     font-size: 20px;
     letter-spacing: 4px;
@@ -117,9 +117,9 @@
   }
   tbody tr:nth-child(odd) { background: rgba(255,255,255,0.02); }
   td.guessCell { letter-spacing: 3px; font-weight: bold; color: #eee; }
-  td.strike { color: #7CFC00; font-weight: bold; }
-  td.ball { color: #ffb84d; font-weight: bold; }
-  td.out { color: #ff5555; }
+  .strike { color: #7CFC00; font-weight: bold; }
+  .ball { color: #ffb84d; font-weight: bold; }
+  .out { color: #ff5555; font-weight: bold; }
 
   button#resetBtn {
     margin-top: 16px;
@@ -144,6 +144,39 @@
     text-decoration: underline;
   }
   button#giveUpBtn:hover { color: #ff5555; }
+
+  #markRow {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .markCell {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #16202c;
+    border: 2px solid #2a3a4a;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 14px;
+    color: #eee;
+    user-select: none;
+  }
+  .markCell:hover { border-color: #555; }
+  .markCell.exclude {
+    background: #2a1414;
+    border-color: #5a2020;
+    color: #ff5555;
+    text-decoration: line-through;
+  }
+  .markCell.include {
+    background: #12241a;
+    border-color: #2e5a3a;
+    color: #7CFC00;
+  }
 </style>
 </head>
 <body>
@@ -151,16 +184,25 @@
 <h1>⚾ 숫자 야구</h1>
 <div id="subtitle">
   컴퓨터가 정한 서로 다른 숫자를 맞혀보세요!<br>
-  <b style="color:#7CFC00">스트라이크</b>: 숫자·자리 모두 정답 &nbsp;|&nbsp;
-  <b style="color:#ffb84d">볼</b>: 숫자는 맞지만 자리가 다름 &nbsp;|&nbsp;
-  <b style="color:#ff5555">아웃</b>: 포함되지 않은 숫자
+  <b style="color:#7CFC00">S</b>: 숫자·자리 모두 정답 &nbsp;|&nbsp;
+  <b style="color:#ffb84d">B</b>: 숫자는 맞지만 자리가 다름<br>
+  <b style="color:#ff5555">OUT</b>: 숫자가 전부 다름
 </div>
 
 <div class="settingGroup">
-  <span class="settingLabel">자릿수</span>
-  <div class="settingRow" id="digitSelect">
-    <button class="optBtn active" data-digits="3">3자리</button>
-    <button class="optBtn" data-digits="4">4자리</button>
+  <span class="settingLabel">중복 가능 여부</span>
+  <div class="settingRow" id="dupSelect">
+    <button class="optBtn active" data-dup="no">중복 불가</button>
+    <button class="optBtn" data-dup="yes">중복 가능</button>
+  </div>
+</div>
+
+<div class="settingGroup">
+  <span class="settingLabel">자릿수 (1~10)</span>
+  <div class="settingRow">
+    <input id="digitInput" type="number" min="1" max="10" value="3"
+      style="width:60px;padding:6px;text-align:center;background:#0a0f16;border:2px solid #2a3a4a;border-radius:6px;color:#7CFC00;font-size:14px;">
+    <button class="optBtn" id="applyDigitBtn">적용</button>
   </div>
 </div>
 
@@ -181,25 +223,94 @@
   </table>
 </div>
 
+<div class="settingGroup">
+  <span class="settingLabel">숫자 메모 (클릭: 제외 → 포함 → 초기화)</span>
+  <div id="markRow"></div>
+</div>
+
 <button id="giveUpBtn">포기하고 정답 보기</button>
 <button id="resetBtn">다시 시작</button>
 
 <script>
-const digitSelectBtns = document.querySelectorAll('#digitSelect .optBtn');
+const digitInput = document.getElementById('digitInput');
+const applyDigitBtn = document.getElementById('applyDigitBtn');
+const dupBtns = document.querySelectorAll('#dupSelect .optBtn');
 const guessInput = document.getElementById('guessInput');
 const submitBtn = document.getElementById('submitBtn');
 const statusEl = document.getElementById('status');
 const attemptsEl = document.getElementById('attempts');
 const historyBody = document.getElementById('historyBody');
+const historyWrapEl = document.getElementById('historyWrap');
 const resetBtn = document.getElementById('resetBtn');
 const giveUpBtn = document.getElementById('giveUpBtn');
+const markRowEl = document.getElementById('markRow');
 
 let digitCount = 3;
+let allowDuplicates = false;
 let secret = [];
 let attempts = 0;
 let gameActive = true;
+let bestScore = null;
+let markStates = Array(10).fill(0); // 0: 표시없음, 1: 제외, 2: 포함
+
+function buildMarkRow() {
+  markRowEl.innerHTML = '';
+  for (let d = 0; d < 10; d++) {
+    const div = document.createElement('div');
+    div.className = 'markCell';
+    div.textContent = d;
+    div.addEventListener('click', () => toggleMark(d));
+    markRowEl.appendChild(div);
+  }
+  renderMarks();
+}
+
+function toggleMark(d) {
+  markStates[d] = (markStates[d] + 1) % 3;
+  renderMarks();
+}
+
+function renderMarks() {
+  const cellDivs = markRowEl.children;
+  for (let d = 0; d < 10; d++) {
+    let cls = 'markCell';
+    if (markStates[d] === 1) cls += ' exclude';
+    if (markStates[d] === 2) cls += ' include';
+    cellDivs[d].className = cls;
+  }
+}
+
+function resetMarks() {
+  markStates = Array(10).fill(0);
+  renderMarks();
+}
+
+function bestKey() {
+  return `numberBaseballBest_${digitCount}_${allowDuplicates ? 'dup' : 'nodup'}`;
+}
+
+function loadBest() {
+  const saved = localStorage.getItem(bestKey());
+  bestScore = saved ? Number(saved) : null;
+}
+
+function updateAttemptsDisplay() {
+  const bestText = bestScore !== null ? bestScore : '-';
+  attemptsEl.textContent = `시도 횟수: ${attempts} / 최고 점수: ${bestText}`;
+}
 
 function generateSecret(n) {
+  if (allowDuplicates) {
+    let picked;
+    let tries = 0;
+    do {
+      picked = [];
+      for (let i = 0; i < n; i++) picked.push(Math.floor(Math.random() * 10));
+      tries++;
+    } while (n > 1 && picked[0] === 0 && tries < 50);
+    return picked;
+  }
+
   const pool = [0,1,2,3,4,5,6,7,8,9];
   // 셔플
   for (let i = pool.length - 1; i > 0; i--) {
@@ -220,11 +331,16 @@ function initGame() {
   attempts = 0;
   gameActive = true;
   historyBody.innerHTML = '';
-  attemptsEl.textContent = '시도 횟수: 0';
-  statusEl.textContent = `서로 다른 숫자 ${digitCount}개를 입력하세요 (0~9)`;
+  resetMarks();
+  loadBest();
+  updateAttemptsDisplay();
+  statusEl.textContent = allowDuplicates
+    ? `숫자 ${digitCount}개를 입력하세요 (0~9, 중복 가능)`
+    : `서로 다른 숫자 ${digitCount}개를 입력하세요 (0~9)`;
   guessInput.value = '';
   guessInput.maxLength = digitCount;
   guessInput.placeholder = '?'.repeat(digitCount);
+  guessInput.style.width = Math.max(160, digitCount * 26 + 20) + 'px';
   guessInput.disabled = false;
   submitBtn.disabled = false;
   guessInput.focus();
@@ -233,18 +349,38 @@ function initGame() {
 function validateGuess(str) {
   if (!/^\d+$/.test(str)) return '숫자만 입력해주세요';
   if (str.length !== digitCount) return `${digitCount}자리 숫자를 입력해주세요`;
-  const digits = str.split('').map(Number);
-  const unique = new Set(digits);
-  if (unique.size !== digits.length) return '중복되지 않는 숫자를 입력해주세요';
+  if (!allowDuplicates) {
+    const digits = str.split('').map(Number);
+    const unique = new Set(digits);
+    if (unique.size !== digits.length) return '중복되지 않는 숫자를 입력해주세요';
+  }
   return null;
 }
 
 function judge(guessDigits) {
-  let strike = 0, ball = 0;
+  let strike = 0;
+  const secretRemain = [];
+  const guessRemain = [];
+
   guessDigits.forEach((d, i) => {
-    if (secret[i] === d) strike++;
-    else if (secret.includes(d)) ball++;
+    if (secret[i] === d) {
+      strike++;
+    } else {
+      secretRemain.push(secret[i]);
+      guessRemain.push(d);
+    }
   });
+
+  let ball = 0;
+  const secretCount = {};
+  secretRemain.forEach(d => { secretCount[d] = (secretCount[d] || 0) + 1; });
+  guessRemain.forEach(d => {
+    if (secretCount[d] > 0) {
+      ball++;
+      secretCount[d]--;
+    }
+  });
+
   const out = digitCount - strike - ball;
   return { strike, ball, out };
 }
@@ -260,21 +396,33 @@ function submitGuess() {
 
   const digits = raw.split('').map(Number);
   attempts++;
-  attemptsEl.textContent = `시도 횟수: ${attempts}`;
+  updateAttemptsDisplay();
 
   const { strike, ball, out } = judge(digits);
   addHistoryRow(attempts, raw, strike, ball, out);
 
   if (strike === digitCount) {
-    statusEl.textContent = `🎉 정답입니다! ${attempts}번 만에 맞혔어요!`;
+    let newRecord = false;
+    if (bestScore === null || attempts < bestScore) {
+      bestScore = attempts;
+      localStorage.setItem(bestKey(), bestScore);
+      newRecord = true;
+    }
+    updateAttemptsDisplay();
+    statusEl.textContent = newRecord
+      ? `🎉 정답입니다! ${attempts}번 만에 맞혔어요! 🏆 최고 기록 갱신! 🎉`
+      : `🎉 정답입니다! ${attempts}번 만에 맞혔어요! 🎉`;
     endGame();
     return;
   }
 
   if (strike === 0 && ball === 0) {
-    statusEl.textContent = `${out} 아웃! 입력한 숫자가 하나도 없어요`;
+    statusEl.textContent = `OUT! 입력한 숫자가 하나도 없어요`;
   } else {
-    statusEl.textContent = `${strike} 스트라이크, ${ball} 볼`;
+    const parts = [];
+    if (strike > 0) parts.push(`${strike}S`);
+    if (ball > 0) parts.push(`${ball}B`);
+    statusEl.textContent = parts.join(', ');
   }
 
   guessInput.value = '';
@@ -283,11 +431,20 @@ function submitGuess() {
 
 function addHistoryRow(n, guess, strike, ball, out) {
   const tr = document.createElement('tr');
-  const resultText = (strike === digitCount)
-    ? `${strike} 스트라이크 🎉`
-    : `<span class="strike">${strike}S</span> <span class="ball">${ball}B</span> <span class="out">${out}O</span>`;
+  let resultText;
+  if (strike === digitCount) {
+    resultText = `🎉 <span class="strike">${strike}S</span> 🎉`;
+  } else if (strike === 0 && ball === 0) {
+    resultText = `<span class="out">OUT</span>`;
+  } else {
+    const parts = [];
+    if (strike > 0) parts.push(`<span class="strike">${strike}S</span>`);
+    if (ball > 0) parts.push(`<span class="ball">${ball}B</span>`);
+    resultText = parts.join(' ');
+  }
   tr.innerHTML = `<td>${n}</td><td class="guessCell">${guess}</td><td>${resultText}</td>`;
-  historyBody.prepend(tr);
+  historyBody.appendChild(tr);
+  historyWrapEl.scrollTop = historyWrapEl.scrollHeight;
 }
 
 function endGame() {
@@ -313,15 +470,30 @@ guessInput.addEventListener('input', () => {
 resetBtn.addEventListener('click', initGame);
 giveUpBtn.addEventListener('click', giveUp);
 
-digitSelectBtns.forEach(btn => {
+function applyDigitCount() {
+  let val = parseInt(digitInput.value, 10);
+  if (isNaN(val) || val < 1) val = 1;
+  if (val > 10) val = 10;
+  digitInput.value = val;
+  digitCount = val;
+  initGame();
+}
+
+applyDigitBtn.addEventListener('click', applyDigitCount);
+digitInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') applyDigitCount();
+});
+
+dupBtns.forEach(btn => {
   btn.addEventListener('click', () => {
-    digitSelectBtns.forEach(b => b.classList.remove('active'));
+    dupBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    digitCount = Number(btn.dataset.digits);
+    allowDuplicates = btn.dataset.dup === 'yes';
     initGame();
   });
 });
 
+buildMarkRow();
 initGame();
 </script>
 </body>
