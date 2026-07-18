@@ -15,6 +15,7 @@
     background: linear-gradient(135deg, #1e2a3a, #0f1620);
     font-family: 'Segoe UI', Arial, sans-serif;
     color: #eee;
+    padding: 20px 0;
   }
   h1 {
     margin-bottom: 4px;
@@ -30,13 +31,23 @@
     text-align: center;
     max-width: 320px;
   }
-  #modeSelect {
+  .settingGroup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .settingLabel {
+    font-size: 12px;
+    color: #999;
+  }
+  .settingRow {
     display: flex;
     gap: 10px;
-    margin-bottom: 14px;
   }
-  .modeBtn {
-    padding: 8px 16px;
+  .optBtn {
+    padding: 7px 16px;
     font-size: 14px;
     background: #16202c;
     color: #eee;
@@ -44,12 +55,12 @@
     border-radius: 6px;
     cursor: pointer;
   }
-  .modeBtn.active {
+  .optBtn.active {
     border-color: #7CFC00;
     color: #7CFC00;
   }
   #status {
-    margin-bottom: 14px;
+    margin: 10px 0 14px;
     font-size: 17px;
     min-height: 24px;
     text-align: center;
@@ -78,8 +89,8 @@
   .cell:hover {
     background: #16202c;
   }
-  .cell.x { color: #7CFC00; }
-  .cell.o { color: #ff5555; }
+  .cell.x { color: #ff5555; }
+  .cell.o { color: #7CFC00; }
   .cell.win {
     background: rgba(124, 252, 0, 0.15);
   }
@@ -114,19 +125,37 @@
 <body>
 
 <h1>👻 사라지는 틱택토</h1>
-<div id="subtitle">각자 말은 최대 3개까지! 4번째를 두면 자기 말 중 가장 오래된 게 사라져요. (흐릿하게 깜빡이는 말이 다음에 사라질 말이에요)</div>
+<div id="subtitle">각자 말은 최대 3개까지! 4번째를 두면 자기 말 중 가장 오래된 게 사라져요.</div>
 
-<div id="modeSelect">
-  <button class="modeBtn active" data-mode="pvp">2인 플레이</button>
-  <button class="modeBtn" data-mode="cpu">컴퓨터와 대전</button>
+<div class="settingGroup">
+  <span class="settingLabel">상대 종류</span>
+  <div class="settingRow" id="modeSelect">
+    <button class="optBtn active" data-mode="cpu">컴퓨터와 대전</button>
+    <button class="optBtn" data-mode="pvp">2인 플레이</button>
+  </div>
 </div>
 
-<div id="status">X 차례입니다</div>
+<div class="settingGroup">
+  <span class="settingLabel">내 기호</span>
+  <div class="settingRow" id="symbolSelect">
+    <button class="optBtn active" data-symbol="O">⭕</button>
+    <button class="optBtn" data-symbol="X">❌</button>
+  </div>
+</div>
+
+<div class="settingGroup">
+  <span class="settingLabel">먼저 두는 사람</span>
+  <div class="settingRow" id="firstSelect">
+    <button class="optBtn active" data-first="me">나</button>
+    <button class="optBtn" data-first="opponent">상대</button>
+  </div>
+</div>
+
+<div id="status">시작합니다...</div>
 <div id="board"></div>
 
 <div id="score">
-  <span>X 승: <span id="scoreX">0</span></span>
-  <span>O 승: <span id="scoreO">0</span></span>
+  <span>승점 | 나 : <span id="scoreMe">0</span> vs 상대 : <span id="scoreOpp">0</span></span>
 </div>
 
 <button id="resetBtn">다시 시작</button>
@@ -135,22 +164,35 @@
 const boardEl = document.getElementById('board');
 const statusEl = document.getElementById('status');
 const resetBtn = document.getElementById('resetBtn');
-const modeBtns = document.querySelectorAll('.modeBtn');
-const scoreXEl = document.getElementById('scoreX');
-const scoreOEl = document.getElementById('scoreO');
+const modeBtns = document.querySelectorAll('#modeSelect .optBtn');
+const symbolBtns = document.querySelectorAll('#symbolSelect .optBtn');
+const firstBtns = document.querySelectorAll('#firstSelect .optBtn');
+const scoreMeEl = document.getElementById('scoreMe');
+const scoreOppEl = document.getElementById('scoreOpp');
 
 let cells = Array(9).fill(null);
-let playerMoves = { X: [], O: [] }; // 각 플레이어가 둔 순서대로 칸 번호 저장 (최대 3개)
+let playerMoves = { X: [], O: [] };
 let currentPlayer = 'X';
 let gameActive = true;
-let mode = 'pvp';
-let scores = { X: 0, O: 0 };
+
+let mode = 'cpu';          // 'pvp' | 'cpu'
+let mySymbol = 'O';        // 'X' | 'O' - 내가 쓸 기호
+let firstMover = 'me';     // 'me' | 'opponent'
+let scores = { me: 0, opponent: 0 };
 
 const winPatterns = [
   [0,1,2],[3,4,5],[6,7,8],
   [0,3,6],[1,4,7],[2,5,8],
   [0,4,8],[2,4,6]
 ];
+
+function otherSymbol(s) { return s === 'X' ? 'O' : 'X'; }
+function opponentSymbol() { return otherSymbol(mySymbol); }
+function labelOf(symbol) {
+  if (symbol === mySymbol) return '나';
+  return mode === 'cpu' ? '컴퓨터' : '상대';
+}
+function roleOf(symbol) { return symbol === mySymbol ? 'me' : 'opponent'; }
 
 function buildBoard() {
   boardEl.innerHTML = '';
@@ -173,10 +215,9 @@ function render() {
     cellDivs[i].className = cls;
   });
 
-  // 다음에 사라질 말 표시 (각 플레이어가 이미 3개를 뒀을 때, 가장 오래된 말)
-  ['X', 'O'].forEach(player => {
-    if (playerMoves[player].length === 3) {
-      const fadingIndex = playerMoves[player][0];
+  ['X', 'O'].forEach(symbol => {
+    if (playerMoves[symbol].length === 3) {
+      const fadingIndex = playerMoves[symbol][0];
       cellDivs[fadingIndex].classList.add('fading');
     }
   });
@@ -184,33 +225,34 @@ function render() {
 
 function handleClick(i) {
   if (!gameActive || cells[i]) return;
-  makeMove(i, currentPlayer);
+  // pvp 모드에서는 아무나 클릭 가능(로컬 2인), cpu 모드에서는 내 차례일 때만 클릭 허용
+  if (mode === 'cpu' && currentPlayer !== mySymbol) return;
 
+  makeMove(i, currentPlayer);
   if (checkEnd()) return;
 
-  currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+  currentPlayer = otherSymbol(currentPlayer);
   updateStatus();
 
-  if (mode === 'cpu' && currentPlayer === 'O' && gameActive) {
+  if (mode === 'cpu' && currentPlayer !== mySymbol && gameActive) {
     statusEl.textContent = '컴퓨터 생각 중...';
     setTimeout(cpuMove, 500);
   }
 }
 
-function makeMove(i, player) {
-  // 이미 3개를 뒀다면 가장 오래된 말 제거
-  if (playerMoves[player].length === 3) {
-    const oldest = playerMoves[player].shift();
+function makeMove(i, symbol) {
+  if (playerMoves[symbol].length === 3) {
+    const oldest = playerMoves[symbol].shift();
     cells[oldest] = null;
   }
-  cells[i] = player;
-  playerMoves[player].push(i);
+  cells[i] = symbol;
+  playerMoves[symbol].push(i);
   render();
 }
 
 function updateStatus() {
   const willVanish = playerMoves[currentPlayer].length === 3;
-  statusEl.textContent = `${currentPlayer} 차례입니다` + (willVanish ? ' (이번 수를 두면 오래된 말이 사라져요)' : '');
+  statusEl.textContent = `${labelOf(currentPlayer)}(${currentPlayer}) 차례입니다` + (willVanish ? ' — 이번 수를 두면 오래된 말이 사라져요' : '');
 }
 
 function checkEnd() {
@@ -218,13 +260,13 @@ function checkEnd() {
   if (winInfo) {
     gameActive = false;
     highlightWin(winInfo.pattern);
-    statusEl.textContent = `🎉 ${winInfo.winner} 승리!`;
-    scores[winInfo.winner]++;
+    const role = roleOf(winInfo.winner);
+    statusEl.textContent = `🎉 ${labelOf(winInfo.winner)}(${winInfo.winner}) 승리!`;
+    scores[role]++;
     updateScore();
     return true;
   }
   return false;
-  // 참고: 말이 계속 사라지고 다시 놓이는 방식이라 무승부(보드 꽉 참)는 사실상 발생하지 않음
 }
 
 function getWinner() {
@@ -243,31 +285,30 @@ function highlightWin(pattern) {
 }
 
 function updateScore() {
-  scoreXEl.textContent = scores.X;
-  scoreOEl.textContent = scores.O;
+  scoreMeEl.textContent = scores.me;
+  scoreOppEl.textContent = scores.opponent;
 }
 
-// 간단한 CPU: 이길 수 있으면 이기고, 막아야 하면 막고, 아니면 랜덤
 function cpuMove() {
   if (!gameActive) return;
-
-  let move = findBestMove('O') ?? findBestMove('X') ?? randomMove();
-  makeMove(move, 'O');
+  const cpuSymbol = opponentSymbol();
+  let move = findBestMove(cpuSymbol) ?? findBestMove(mySymbol) ?? randomMove();
+  makeMove(move, cpuSymbol);
 
   if (checkEnd()) return;
 
-  currentPlayer = 'X';
+  currentPlayer = mySymbol;
   updateStatus();
 }
 
-function findBestMove(player) {
+function findBestMove(symbol) {
   for (const pattern of winPatterns) {
     const [a,b,c] = pattern;
     const line = [cells[a], cells[b], cells[c]];
     const idxs = [a,b,c];
-    const playerCount = line.filter(v => v === player).length;
+    const count = line.filter(v => v === symbol).length;
     const emptyIdx = idxs[line.findIndex(v => v === null)];
-    if (playerCount === 2 && line.includes(null)) {
+    if (count === 2 && line.includes(null)) {
       return emptyIdx;
     }
   }
@@ -282,11 +323,24 @@ function randomMove() {
 function resetGame() {
   cells = Array(9).fill(null);
   playerMoves = { X: [], O: [] };
-  currentPlayer = 'X';
   gameActive = true;
+
+  currentPlayer = (firstMover === 'me') ? mySymbol : opponentSymbol();
+
   buildBoard();
   render();
   updateStatus();
+
+  if (mode === 'cpu' && currentPlayer !== mySymbol) {
+    statusEl.textContent = '컴퓨터 생각 중...';
+    setTimeout(cpuMove, 500);
+  }
+}
+
+function resetScoresAndGame() {
+  scores = { me: 0, opponent: 0 };
+  updateScore();
+  resetGame();
 }
 
 resetBtn.addEventListener('click', resetGame);
@@ -296,13 +350,31 @@ modeBtns.forEach(btn => {
     modeBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     mode = btn.dataset.mode;
-    resetGame();
+    resetScoresAndGame();
+  });
+});
+
+symbolBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    symbolBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    mySymbol = btn.dataset.symbol;
+    resetScoresAndGame();
+  });
+});
+
+firstBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    firstBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    firstMover = btn.dataset.first;
+    resetScoresAndGame();
   });
 });
 
 buildBoard();
 render();
-updateStatus();
+resetGame();
 </script>
 </body>
 </html>
