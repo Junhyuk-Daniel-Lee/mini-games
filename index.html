@@ -40,6 +40,20 @@
     transform: translateY(-8px);
   }
   .card .emoji { font-size: 80px; display: block; margin-bottom: 20px; }
+  .janggi-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5em;
+    height: 1.5em;
+    clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+    background: #f0e2c0;
+    border: 0.08em solid currentColor;
+    font-size: 0.62em;
+    font-weight: bold;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    vertical-align: middle;
+  }
 </style>
 </head>
 <body>
@@ -50,7 +64,7 @@
       Snake
     </a>
     <a class="card" href="tictactoe/">
-      <span class="emoji">⭕</span>
+      <span class="emoji" style="font-weight:900"><span style="color:#3b82f6">O</span><span style="color:#ff5555">X</span></span>
       Tic Tac Toe
     </a>
     <a class="card" href="minesweeper/">
@@ -70,7 +84,9 @@
       체스
     </a>
     <a class="card" href="janggi/">
-      <span class="emoji">♟</span>
+      <span class="emoji">
+        <span class="janggi-badge" style="color:#2c6fbb">楚</span><span class="janggi-badge" style="color:#c0392b">漢</span>
+      </span>
       장기
     </a>
     <!-- 다음 게임 추가 시 여기에 카드 추가 -->
