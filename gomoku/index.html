@@ -15,72 +15,72 @@
     background: linear-gradient(135deg, #1e2a3a, #0f1620);
     font-family: 'Segoe UI', Arial, sans-serif;
     color: #eee;
-    padding: 20px 0;
+    padding: 40px 0;
   }
   h1 {
-    margin-bottom: 4px;
-    font-size: 26px;
-    letter-spacing: 1px;
+    margin-bottom: 8px;
+    font-size: 52px;
+    letter-spacing: 2px;
     color: #7CFC00;
   }
   #subtitle {
-    font-size: 13px;
+    font-size: 26px;
     color: #999;
-    margin-bottom: 12px;
+    margin-bottom: 24px;
     text-align: center;
   }
   .settingGroup {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 12px;
+    gap: 12px;
+    margin-bottom: 24px;
   }
-  .settingLabel { font-size: 12px; color: #999; }
-  .settingRow { display: flex; gap: 10px; }
+  .settingLabel { font-size: 24px; color: #999; }
+  .settingRow { display: flex; gap: 20px; }
   .optBtn {
-    padding: 7px 16px;
-    font-size: 14px;
+    padding: 14px 32px;
+    font-size: 28px;
     background: #16202c;
     color: #eee;
-    border: 2px solid #2a3a4a;
-    border-radius: 6px;
+    border: 4px solid #2a3a4a;
+    border-radius: 12px;
     cursor: pointer;
   }
   .optBtn.active { border-color: #7CFC00; color: #7CFC00; }
 
   #status {
-    margin: 8px 0 12px;
-    font-size: 16px;
-    min-height: 22px;
+    margin: 16px 0 24px;
+    font-size: 32px;
+    min-height: 44px;
     text-align: center;
   }
 
   #boardWrap {
     background: #c8965a;
-    border-radius: 6px;
-    padding: 10px;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-    max-width: 94vw;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+    max-width: 96vw;
     overflow: auto;
   }
   canvas { display: block; cursor: pointer; }
 
   #score {
-    margin-top: 14px;
+    margin-top: 28px;
     display: flex;
-    gap: 24px;
-    font-size: 15px;
+    gap: 48px;
+    font-size: 30px;
   }
 
   button#resetBtn {
-    margin-top: 12px;
-    padding: 8px 20px;
-    font-size: 15px;
+    margin-top: 24px;
+    padding: 16px 40px;
+    font-size: 30px;
     background: #16202c;
     color: #eee;
-    border: 2px solid #2a3a4a;
-    border-radius: 6px;
+    border: 4px solid #2a3a4a;
+    border-radius: 12px;
     cursor: pointer;
   }
   button#resetBtn:hover { border-color: #7CFC00; color: #7CFC00; }
@@ -144,8 +144,8 @@ const scoreDrawEl = document.getElementById('scoreDraw');
 const resetBtn = document.getElementById('resetBtn');
 
 const N = 19;
-const CELL = 28;
-const PAD = 20;
+const CELL = 56;
+const PAD = 40;
 const SIZE = PAD * 2 + CELL * (N - 1);
 canvas.width = SIZE;
 canvas.height = SIZE;
@@ -197,7 +197,7 @@ function updateStatus() {
 function drawBoard() {
   ctx.clearRect(0, 0, SIZE, SIZE);
   ctx.strokeStyle = '#5a3d20';
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 2;
   for (let i = 0; i < N; i++) {
     ctx.beginPath();
     ctx.moveTo(PAD, PAD + i * CELL);
@@ -213,7 +213,7 @@ function drawBoard() {
   ctx.fillStyle = '#5a3d20';
   stars.forEach(r => stars.forEach(c => {
     ctx.beginPath();
-    ctx.arc(PAD + c * CELL, PAD + r * CELL, 3, 0, Math.PI * 2);
+    ctx.arc(PAD + c * CELL, PAD + r * CELL, 6, 0, Math.PI * 2);
     ctx.fill();
   }));
 
@@ -225,7 +225,7 @@ function drawBoard() {
 
   if (winLine) {
     ctx.strokeStyle = '#ff5555';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.moveTo(PAD + winLine[0][1] * CELL, PAD + winLine[0][0] * CELL);
     ctx.lineTo(PAD + winLine[1][1] * CELL, PAD + winLine[1][0] * CELL);
@@ -250,7 +250,7 @@ function drawStone(r, c, color) {
   ctx.fillStyle = grad;
   ctx.fill();
   ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 2;
   ctx.stroke();
 }
 
