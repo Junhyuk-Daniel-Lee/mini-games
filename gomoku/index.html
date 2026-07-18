@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>오목</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1e2a3a, #0f1620);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #eee;
+    padding: 20px 0;
+  }
+  h1 {
+    margin-bottom: 4px;
+    font-size: 26px;
+    letter-spacing: 1px;
+    color: #7CFC00;
+  }
+  #subtitle {
+    font-size: 13px;
+    color: #999;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .settingGroup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .settingLabel { font-size: 12px; color: #999; }
+  .settingRow { display: flex; gap: 10px; }
+  .optBtn {
+    padding: 7px 16px;
+    font-size: 14px;
+    background: #16202c;
+    color: #eee;
+    border: 2px solid #2a3a4a;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .optBtn.active { border-color: #7CFC00; color: #7CFC00; }
+
+  #status {
+    margin: 8px 0 12px;
+    font-size: 16px;
+    min-height: 22px;
+    text-align: center;
+  }
+
+  #boardWrap {
+    background: #c8965a;
+    border-radius: 6px;
+    padding: 10px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    max-width: 94vw;
+    overflow: auto;
+  }
+  canvas { display: block; cursor: pointer; }
+
+  #score {
+    margin-top: 14px;
+    display: flex;
+    gap: 24px;
+    font-size: 15px;
+  }
+
+  button#resetBtn {
+    margin-top: 12px;
+    padding: 8px 20px;
+    font-size: 15px;
+    background: #16202c;
+    color: #eee;
+    border: 2px solid #2a3a4a;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  button#resetBtn:hover { border-color: #7CFC00; color: #7CFC00; }
+</style>
+</head>
+<body>
+
+<h1>⚫ 오목 ⚪</h1>
+<div id="subtitle">가로·세로·대각선 중 하나로 같은 색 돌을 5개 먼저 이으면 승리!<br>⚫ 흑(선공)은 33(더블 쓰리) 자리에는 둘 수 없어요.</div>
+
+<div class="settingGroup">
+  <span class="settingLabel">상대 종류</span>
+  <div class="settingRow" id="modeSelect">
+    <button class="optBtn active" data-mode="cpu">컴퓨터와 대전</button>
+    <button class="optBtn" data-mode="pvp">2인 플레이</button>
+  </div>
+</div>
+
+<div class="settingGroup" id="levelGroup">
+  <span class="settingLabel">컴퓨터 난이도</span>
+  <div class="settingRow" id="levelSelect">
+    <button class="optBtn" data-level="1">1</button>
+    <button class="optBtn" data-level="2">2</button>
+    <button class="optBtn active" data-level="3">3</button>
+    <button class="optBtn" data-level="4">4</button>
+    <button class="optBtn" data-level="5">5</button>
+  </div>
+</div>
+
+<div class="settingGroup">
+  <span class="settingLabel">내 돌 색</span>
+  <div class="settingRow" id="colorSelect">
+    <button class="optBtn active" data-color="1">⚫ 흑 (선공)</button>
+    <button class="optBtn" data-color="2">⚪ 백 (후공)</button>
+  </div>
+</div>
+
+<div id="status">흑 차례입니다</div>
+
+<div id="boardWrap">
+  <canvas id="board"></canvas>
+</div>
+
+<div id="score">
+  <span>나 : <span id="scoreMe">0</span> / 상대 : <span id="scoreOpp">0</span> / 무승부 : <span id="scoreDraw">0</span></span>
+</div>
+
+<button id="resetBtn">다시 시작</button>
+
+<script>
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+const modeBtns = document.querySelectorAll('#modeSelect .optBtn');
+const colorBtns = document.querySelectorAll('#colorSelect .optBtn');
+const levelBtns = document.querySelectorAll('#levelSelect .optBtn');
+const levelGroupEl = document.getElementById('levelGroup');
+const scoreMeEl = document.getElementById('scoreMe');
+const scoreOppEl = document.getElementById('scoreOpp');
+const scoreDrawEl = document.getElementById('scoreDraw');
+const resetBtn = document.getElementById('resetBtn');
+
+const N = 19;
+const CELL = 28;
+const PAD = 20;
+const SIZE = PAD * 2 + CELL * (N - 1);
+canvas.width = SIZE;
+canvas.height = SIZE;
+
+let grid = [];
+let mode = 'cpu';       // 'pvp' | 'cpu'
+let myColor = 1;        // 1: 흑, 2: 백 (cpu 모드에서 내가 쓰는 돌)
+let currentColor = 1;   // 현재 차례 (1 흑 먼저 시작)
+let gameActive = true;
+let scores = { me: 0, opponent: 0, draw: 0 };
+let winLine = null;
+
+function colorName(c) { return c === 1 ? '흑' : '백'; }
+function opponentColor(c) { return c === 1 ? 2 : 1; }
+
+function setMyColorUI(c) {
+  myColor = c;
+  colorBtns.forEach(b => b.classList.toggle('active', Number(b.dataset.color) === c));
+}
+
+function updateScoreDisplay() {
+  scoreMeEl.textContent = scores.me;
+  scoreOppEl.textContent = scores.opponent;
+  scoreDrawEl.textContent = scores.draw;
+}
+
+function initGame() {
+  grid = Array.from({ length: N }, () => Array(N).fill(0));
+  currentColor = 1;
+  gameActive = true;
+  winLine = null;
+  drawBoard();
+  updateStatus();
+
+  if (mode === 'cpu' && currentColor !== myColor) {
+    statusEl.textContent = '컴퓨터 생각 중...';
+    setTimeout(cpuMove, 400);
+  }
+}
+
+function updateStatus() {
+  if (!gameActive) return;
+  const who = (mode === 'cpu') ? (currentColor === myColor ? '나' : '컴퓨터') : null;
+  statusEl.textContent = who
+    ? `${colorName(currentColor)}(${who}) 차례입니다`
+    : `${colorName(currentColor)} 차례입니다`;
+}
+
+function drawBoard() {
+  ctx.clearRect(0, 0, SIZE, SIZE);
+  ctx.strokeStyle = '#5a3d20';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < N; i++) {
+    ctx.beginPath();
+    ctx.moveTo(PAD, PAD + i * CELL);
+    ctx.lineTo(SIZE - PAD, PAD + i * CELL);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(PAD + i * CELL, PAD);
+    ctx.lineTo(PAD + i * CELL, SIZE - PAD);
+    ctx.stroke();
+  }
+  // 화점(별표 점) - 19x19 정식 바둑판 기준
+  const stars = [3, 9, 15];
+  ctx.fillStyle = '#5a3d20';
+  stars.forEach(r => stars.forEach(c => {
+    ctx.beginPath();
+    ctx.arc(PAD + c * CELL, PAD + r * CELL, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }));
+
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      if (grid[r][c] !== 0) drawStone(r, c, grid[r][c]);
+    }
+  }
+
+  if (winLine) {
+    ctx.strokeStyle = '#ff5555';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(PAD + winLine[0][1] * CELL, PAD + winLine[0][0] * CELL);
+    ctx.lineTo(PAD + winLine[1][1] * CELL, PAD + winLine[1][0] * CELL);
+    ctx.stroke();
+  }
+}
+
+function drawStone(r, c, color) {
+  const x = PAD + c * CELL;
+  const y = PAD + r * CELL;
+  const radius = CELL * 0.42;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  const grad = ctx.createRadialGradient(x - radius*0.3, y - radius*0.3, radius*0.1, x, y, radius);
+  if (color === 1) {
+    grad.addColorStop(0, '#555');
+    grad.addColorStop(1, '#000');
+  } else {
+    grad.addColorStop(0, '#fff');
+    grad.addColorStop(1, '#ccc');
+  }
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function pixelToCell(x, y) {
+  const c = Math.round((x - PAD) / CELL);
+  const r = Math.round((y - PAD) / CELL);
+  if (r < 0 || r >= N || c < 0 || c >= N) return null;
+  return { r, c };
+}
+
+canvas.addEventListener('click', (e) => {
+  if (!gameActive) return;
+  if (mode === 'cpu' && currentColor !== myColor) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+  const cell = pixelToCell(x, y);
+  if (!cell) return;
+  placeStone(cell.r, cell.c, currentColor);
+});
+
+function placeStone(r, c, color) {
+  if (grid[r][c] !== 0 || !gameActive) return false;
+
+  if (color === 1 && isDoubleThree(r, c, 1)) {
+    statusEl.textContent = '⚠️ 흑은 33(더블 쓰리) 자리에는 둘 수 없어요. 다른 곳에 두세요.';
+    return false;
+  }
+
+  grid[r][c] = color;
+  drawBoard();
+
+  const win = checkWin(r, c, color);
+  if (win) {
+    gameActive = false;
+    winLine = [win.start, win.end];
+    drawBoard();
+    const role = (color === myColor) ? 'me' : 'opponent';
+    scores[role]++;
+    updateScoreDisplay();
+
+    // 두 번째 판부터: 이긴 사람이 다음 판에는 백(후공)이 되도록 기본값 설정
+    const nextColor = (color === myColor) ? 2 : 1;
+    setMyColorUI(nextColor);
+    statusEl.textContent = `🎉 ${colorName(color)} 승리!`;
+    return true;
+  }
+
+  if (isBoardFull()) {
+    gameActive = false;
+    scores.draw++;
+    updateScoreDisplay();
+    statusEl.textContent = '무승부입니다!';
+    return true;
+  }
+
+  currentColor = opponentColor(color);
+  updateStatus();
+
+  if (mode === 'cpu' && gameActive && currentColor !== myColor) {
+    statusEl.textContent = '컴퓨터 생각 중...';
+    setTimeout(cpuMove, 400);
+  }
+  return true;
+}
+
+function isBoardFull() {
+  return grid.every(row => row.every(v => v !== 0));
+}
+
+const DIRS = [
+  [0, 1], [1, 0], [1, 1], [1, -1]
+];
+
+// ---------- 흑의 33(더블 쓰리) 금수 판정 ----------
+function buildLineString(r, c, dr, dc, radius, color) {
+  let s = '';
+  for (let i = -radius; i <= radius; i++) {
+    if (i === 0) { s += 'X'; continue; }
+    const rr = r + dr * i, cc = c + dc * i;
+    if (rr < 0 || rr >= N || cc < 0 || cc >= N) { s += 'B'; continue; }
+    const v = grid[rr][cc];
+    if (v === 0) s += '_';
+    else if (v === color) s += 'X';
+    else s += 'B';
+  }
+  return s;
+}
+
+function lineHasOpenThree(s) {
+  const center = 4; // radius 4 → 문자열 길이 9, 중심 인덱스 4
+  for (let start = 0; start <= s.length - 5; start++) {
+    if (s.substr(start, 5) === '_XXX_' && start <= center && start + 4 >= center) return true;
+  }
+  const patterns6 = ['_XX_X_', '_X_XX_'];
+  for (let start = 0; start <= s.length - 6; start++) {
+    const sub = s.substr(start, 6);
+    if (patterns6.includes(sub) && start <= center && start + 5 >= center) return true;
+  }
+  return false;
+}
+
+function countOpenThrees(r, c, color) {
+  let count = 0;
+  for (const [dr, dc] of DIRS) {
+    const line = buildLineString(r, c, dr, dc, 4, color);
+    if (lineHasOpenThree(line)) count++;
+  }
+  return count;
+}
+
+function isDoubleThree(r, c, color) {
+  if (grid[r][c] !== 0) return false;
+  return countOpenThrees(r, c, color) >= 2;
+}
+
+function checkWin(r, c, color) {
+  for (const [dr, dc] of DIRS) {
+    let count = 1;
+    let start = [r, c];
+    let end = [r, c];
+
+    let rr = r + dr, cc = c + dc;
+    while (rr >= 0 && rr < N && cc >= 0 && cc < N && grid[rr][cc] === color) {
+      count++; end = [rr, cc];
+      rr += dr; cc += dc;
+    }
+    rr = r - dr; cc = c - dc;
+    while (rr >= 0 && rr < N && cc >= 0 && cc < N && grid[rr][cc] === color) {
+      count++; start = [rr, cc];
+      rr -= dr; cc -= dc;
+    }
+
+    if (count >= 5) return { start, end };
+  }
+  return null;
+}
+
+// ---------- 5단계 난이도 CPU AI ----------
+let cpuLevel = 3;
+
+const LEVELS = {
+  1: { defenseWeight: 0.1, randomPool: 10, lookahead: 0, checkBlock: false },
+  2: { defenseWeight: 0.5, randomPool: 5,  lookahead: 0, checkBlock: 'partial' },
+  3: { defenseWeight: 0.9, randomPool: 1,  lookahead: 0, checkBlock: true },
+  4: { defenseWeight: 1.0, randomPool: 1,  lookahead: 1, checkBlock: true, branch: 6 },
+  5: { defenseWeight: 1.0, randomPool: 1,  lookahead: 2, checkBlock: true, branch: 5 },
+};
+
+function cpuMove() {
+  if (!gameActive) return;
+  const aiColor = opponentColor(myColor);
+  const move = findBestMoveLeveled(aiColor, cpuLevel);
+  if (move) placeStone(move.r, move.c, aiColor);
+}
+
+function findImmediateWin(color) {
+  const candidates = getCandidateCells();
+  for (const { r, c } of candidates) {
+    grid[r][c] = color;
+    const win = checkWin(r, c, color);
+    grid[r][c] = 0;
+    if (win) return { r, c };
+  }
+  return null;
+}
+
+function rankedCandidates(color, oppColor, topK) {
+  const candidates = getCandidateCells();
+  const scored = candidates.map(({ r, c }) => {
+    const offense = evaluatePlacementScore(r, c, color);
+    const defense = evaluatePlacementScore(r, c, oppColor);
+    return { r, c, score: offense + defense * 0.9 };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, topK);
+}
+
+// 음수극대화(negamax) 스타일 탐색: color 차례에서 얻을 수 있는 최선의 (내 수 가치 - 상대 최선 응수) 값
+function negamax(color, oppColor, depth, branch) {
+  if (depth <= 0) return 0;
+  const candidates = rankedCandidates(color, oppColor, branch);
+  if (candidates.length === 0) return 0;
+
+  let best = -Infinity;
+  for (const cand of candidates) {
+    grid[cand.r][cand.c] = color;
+    const placementValue = evaluatePlacementScore(cand.r, cand.c, color);
+    const childValue = negamax(oppColor, color, depth - 1, branch);
+    grid[cand.r][cand.c] = 0;
+    const total = placementValue - childValue;
+    if (total > best) best = total;
+  }
+  return best;
+}
+
+function findBestMoveLeveled(aiColor, level) {
+  const cfg = LEVELS[level];
+  const humanColor = opponentColor(aiColor);
+
+  let candidates = getCandidateCells();
+  if (aiColor === 1) {
+    const filtered = candidates.filter(({ r, c }) => !isDoubleThree(r, c, 1));
+    if (filtered.length > 0) candidates = filtered;
+  }
+  if (candidates.length === 0) {
+    return { r: Math.floor(N/2), c: Math.floor(N/2) };
+  }
+
+  // 즉시 이기는 수는 항상 챙김 (모든 난이도 공통)
+  const winMove = findImmediateWin(aiColor);
+  if (winMove) return winMove;
+
+  // 상대의 즉시 승리를 막을지 여부는 난이도별로 다름
+  if (cfg.checkBlock) {
+    const blockMove = findImmediateWin(humanColor);
+    if (blockMove && candidates.some(c => c.r === blockMove.r && c.c === blockMove.c)) {
+      if (cfg.checkBlock === 'partial') {
+        if (Math.random() < 0.6) return blockMove;
+      } else {
+        return blockMove;
+      }
+    }
+  }
+
+  // 1차: 빠른 점수로 후보 압축
+  let scored = candidates.map(({ r, c }) => {
+    const offense = evaluatePlacementScore(r, c, aiColor);
+    const defense = evaluatePlacementScore(r, c, humanColor);
+    return { r, c, score: offense + defense * cfg.defenseWeight };
+  });
+  scored.sort((a, b) => b.score - a.score);
+
+  // 2차: 높은 난이도는 상위 후보에 한해 내다보기(lookahead) 적용
+  if (cfg.lookahead > 0) {
+    scored = scored.slice(0, 12).map(cand => {
+      grid[cand.r][cand.c] = aiColor;
+      const penalty = negamax(humanColor, aiColor, cfg.lookahead, cfg.branch || 5);
+      grid[cand.r][cand.c] = 0;
+      return { r: cand.r, c: cand.c, score: cand.score - penalty };
+    });
+    scored.sort((a, b) => b.score - a.score);
+  }
+
+  const poolSize = Math.min(cfg.randomPool, scored.length);
+  const pool = scored.slice(0, poolSize);
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function getCandidateCells() {
+  const set = new Set();
+  const list = [];
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      if (grid[r][c] === 0) continue;
+      for (let dr = -2; dr <= 2; dr++) {
+        for (let dc = -2; dc <= 2; dc++) {
+          const nr = r + dr, nc = c + dc;
+          if (nr < 0 || nr >= N || nc < 0 || nc >= N) continue;
+          if (grid[nr][nc] !== 0) continue;
+          const key = nr + '_' + nc;
+          if (!set.has(key)) {
+            set.add(key);
+            list.push({ r: nr, c: nc });
+          }
+        }
+      }
+    }
+  }
+  return list;
+}
+
+function evaluatePlacementScore(r, c, color) {
+  let total = 0;
+  for (const [dr, dc] of DIRS) {
+    total += evaluateDirection(r, c, dr, dc, color);
+  }
+  return total;
+}
+
+function evaluateDirection(r, c, dr, dc, color) {
+  // 이 칸에 돌을 놓았다고 가정하고 한 방향 라인의 연속 길이 + 열린 끝 개수 계산
+  let count = 1;
+  let openEnds = 0;
+
+  let rr = r + dr, cc = c + dc;
+  while (rr >= 0 && rr < N && cc >= 0 && cc < N && grid[rr][cc] === color) {
+    count++; rr += dr; cc += dc;
+  }
+  if (rr >= 0 && rr < N && cc >= 0 && cc < N && grid[rr][cc] === 0) openEnds++;
+
+  rr = r - dr; cc = c - dc;
+  while (rr >= 0 && rr < N && cc >= 0 && cc < N && grid[rr][cc] === color) {
+    count++; rr -= dr; cc -= dc;
+  }
+  if (rr >= 0 && rr < N && cc >= 0 && cc < N && grid[rr][cc] === 0) openEnds++;
+
+  const baseScores = { 1: 5, 2: 20, 3: 400, 4: 6000, 5: 200000 };
+  const capped = Math.min(count, 5);
+  let score = baseScores[capped] || 0;
+
+  if (capped >= 4 && openEnds === 0) score *= 0.15;
+  else if (openEnds === 2) score *= 1.6;
+
+  return score;
+}
+
+// ---------- 이벤트 ----------
+resetBtn.addEventListener('click', initGame);
+
+function updateLevelGroupVisibility() {
+  levelGroupEl.style.display = (mode === 'cpu') ? 'flex' : 'none';
+}
+
+modeBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    modeBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    mode = btn.dataset.mode;
+    scores = { me: 0, opponent: 0, draw: 0 };
+    setMyColorUI(1);
+    updateScoreDisplay();
+    updateLevelGroupVisibility();
+    initGame();
+  });
+});
+
+colorBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    setMyColorUI(Number(btn.dataset.color));
+    updateScoreDisplay();
+    initGame();
+  });
+});
+
+levelBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    levelBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    cpuLevel = Number(btn.dataset.level);
+    initGame();
+  });
+});
+
+updateLevelGroupVisibility();
+updateScoreDisplay();
+initGame();
+</script>
+</body>
+</html>
