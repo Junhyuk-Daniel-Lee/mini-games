@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Mini Games</title>
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1e2a3a, #0f1620);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #eee;
+  }
+  h1 { color: #7CFC00; margin-bottom: 30px; }
+  .games {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 700px;
+  }
+  .card {
+    background: #16202c;
+    border: 2px solid #2a3a4a;
+    border-radius: 10px;
+    padding: 24px 30px;
+    text-align: center;
+    text-decoration: none;
+    color: #eee;
+    transition: 0.2s;
+    width: 160px;
+  }
+  .card:hover {
+    border-color: #7CFC00;
+    transform: translateY(-4px);
+  }
+  .card .emoji { font-size: 40px; display: block; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+  <h1>🎮 Mini Games</h1>
+  <div class="games">
+    <a class="card" href="snake/">
+      <span class="emoji">🐍</span>
+      Snake
+    </a>
+    <a class="card" href="tictactoe/">
+      <span class="emoji">⭕</span>
+      Tic Tac Toe
+    </a>
+    <!-- 다음 게임 추가 시 여기에 카드 추가 -->
+  </div>
+</body>
+</html>
