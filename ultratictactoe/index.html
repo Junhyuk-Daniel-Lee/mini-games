@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>81 돌 게임</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1e2a3a, #0f1620);
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #eee;
+    padding: 40px 12px;
+  }
+  h1 {
+    margin-bottom: 8px;
+    font-size: 40px;
+    letter-spacing: 1px;
+    color: #7CFC00;
+  }
+  .dotGrid {
+    display: inline-grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 4px;
+    width: 32px;
+    height: 32px;
+    vertical-align: middle;
+  }
+  .dotGrid span {
+    border-radius: 50%;
+    width: 100%;
+    height: 100%;
+  }
+  #subtitle {
+    font-size: 17px;
+    color: #999;
+    margin-bottom: 20px;
+    text-align: center;
+    max-width: 620px;
+    line-height: 1.6;
+  }
+  .settingGroup {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .settingLabel { font-size: 15px; color: #999; }
+  .settingRow { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .optBtn {
+    padding: 9px 18px;
+    font-size: 15px;
+    background: #16202c;
+    color: #eee;
+    border: 3px solid #2a3a4a;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .optBtn.active { border-color: #7CFC00; color: #7CFC00; }
+  .colorBtn[data-color="red"].active { border-color: #ff5555; color: #ff5555; }
+  .colorBtn[data-color="blue"].active { border-color: #4d90fe; color: #4d90fe; }
+  .colorBtn[data-color="green"].active { border-color: #4caf50; color: #4caf50; }
+  .colorBtn[data-color="yellow"].active { border-color: #f1c40f; color: #f1c40f; }
+
+  #status {
+    margin: 10px 0 16px;
+    font-size: 19px;
+    min-height: 28px;
+    text-align: center;
+  }
+
+  #boardWrap {
+    background: #16202c;
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+    max-width: 96vw;
+    overflow: auto;
+  }
+  canvas { display: block; cursor: pointer; }
+
+  button#resetBtn {
+    margin-top: 18px;
+    padding: 10px 24px;
+    font-size: 16px;
+    background: #16202c;
+    color: #eee;
+    border: 3px solid #2a3a4a;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  button#resetBtn:hover { border-color: #7CFC00; color: #7CFC00; }
+</style>
+</head>
+<body>
+
+<h1>
+  <span class="dotGrid">
+    <span style="background:#ff5555"></span><span style="background:#4d90fe"></span>
+    <span style="background:#4caf50"></span><span style="background:#f1c40f"></span>
+  </span>
+  3목
+  <span class="dotGrid">
+    <span style="background:#ff5555"></span><span style="background:#4d90fe"></span>
+    <span style="background:#4caf50"></span><span style="background:#f1c40f"></span>
+  </span>
+</h1>
+<div id="subtitle">
+  9개 영역 × 9칸 = 81개의 원형 칸입니다.<br>
+  내가 <b>N번 칸</b>에 두면, 다음 사람은 <b>N번 영역</b>에 둬야 해요.<br>
+  가로·세로·대각선 3개 연속이면 즉시 승리!<br>
+  둘 곳이 없으면 즉시 패배!
+</div>
+
+<div class="settingGroup">
+  <span class="settingLabel">참가 인원</span>
+  <div class="settingRow" id="playerCountSelect">
+    <button class="optBtn active" data-count="2">2</button>
+    <button class="optBtn" data-count="3">3</button>
+    <button class="optBtn" data-count="4">4</button>
+  </div>
+</div>
+
+<div class="settingGroup">
+  <span class="settingLabel">내 순번 (몇 번째로 둘지)</span>
+  <div class="settingRow" id="orderSelect"></div>
+</div>
+
+<div class="settingGroup">
+  <span class="settingLabel">내 돌 색깔</span>
+  <div class="settingRow" id="colorSelect">
+    <button class="optBtn colorBtn active" data-color="red">🔴</button>
+    <button class="optBtn colorBtn" data-color="blue">🔵</button>
+    <button class="optBtn colorBtn" data-color="green">🟢</button>
+    <button class="optBtn colorBtn" data-color="yellow">🟡</button>
+  </div>
+</div>
+
+<div id="status">시작하려면 아무 칸이나 클릭하세요</div>
+
+<div id="boardWrap">
+  <canvas id="board"></canvas>
+</div>
+
+<button id="resetBtn">다시 시작</button>
+
+<script>
+// ============ 상수/유틸 ============
+const COLOR_HEX = { red:'#ff5555', blue:'#4d90fe', green:'#4caf50', yellow:'#f1c40f' };
+const COLOR_LABEL = { red:'빨강', blue:'파랑', green:'초록', yellow:'노랑' };
+const ALL_COLORS = ['red','blue','green','yellow'];
+const DIRS4 = [[0,1],[1,0],[1,1],[1,-1]];
+
+function regionOf(row,col){ return Math.floor(row/3)*3 + Math.floor(col/3); }
+function cellIdxOf(row,col){ return (row%3)*3 + (col%3); }
+function rowColOf(region, cellIdx){
+  return {
+    row: Math.floor(region/3)*3 + Math.floor(cellIdx/3),
+    col: (region%3)*3 + (cellIdx%3)
+  };
+}
+function inBoard(r,c){ return r>=0 && r<9 && c>=0 && c<9; }
+
+// ============ 상태 ============
+const playerCountBtns = document.querySelectorAll('#playerCountSelect .optBtn');
+const orderSelectEl = document.getElementById('orderSelect');
+const colorBtns = document.querySelectorAll('#colorSelect .optBtn');
+const statusEl = document.getElementById('status');
+const resetBtn = document.getElementById('resetBtn');
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+
+let playerCount = 2;
+let myColor = 'red';
+let myPosition = 1; // 1부터 시작하는 내 순번
+
+let board;            // 9x9, null 또는 color 문자열
+let players;          // [{color, isHuman, eliminated}]
+let turnIndex;         // players 배열 인덱스
+let requiredRegion;    // null(자유) 또는 0~8
+let gameActive;
+let winLine;
+let winnerInfo;
+
+const CELL = 58;
+const GAP = 16;
+const PAD = 45;
+function px(col){ return PAD + col*CELL + Math.floor(col/3)*GAP; }
+function py(row){ return PAD + row*CELL + Math.floor(row/3)*GAP; }
+const SIZE = PAD*2 + CELL*8 + GAP*2;
+
+canvas.width = SIZE;
+canvas.height = SIZE;
+
+function setupPlayers() {
+  const others = ALL_COLORS.filter(c => c !== myColor);
+  for (let i = others.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [others[i], others[j]] = [others[j], others[i]];
+  }
+
+  const list = [];
+  let otherIdx = 0;
+  for (let slot = 0; slot < playerCount; slot++) {
+    if (slot === myPosition - 1) {
+      list.push({ color: myColor, isHuman: true, eliminated: false });
+    } else {
+      list.push({ color: others[otherIdx], isHuman: false, eliminated: false });
+      otherIdx++;
+    }
+  }
+  return list;
+}
+
+function playerLabel(p) {
+  if (p.isHuman) return '나';
+  let n = 0;
+  for (const other of players) {
+    if (!other.isHuman) n++;
+    if (other === p) break;
+  }
+  return `컴퓨터${n}`;
+}
+
+function renderOrderButtons() {
+  orderSelectEl.innerHTML = '';
+  if (myPosition > playerCount) myPosition = playerCount;
+  for (let i = 1; i <= playerCount; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'optBtn' + (i === myPosition ? ' active' : '');
+    btn.textContent = i;
+    btn.addEventListener('click', () => {
+      myPosition = i;
+      renderOrderButtons();
+      initGame();
+    });
+    orderSelectEl.appendChild(btn);
+  }
+}
+
+function initGame() {
+  board = Array.from({length:9}, () => Array(9).fill(null));
+  players = setupPlayers();
+  turnIndex = 0;
+  requiredRegion = null;
+  gameActive = true;
+  winLine = null;
+  winnerInfo = null;
+  drawBoard();
+  updateStatus();
+  maybeRunAI();
+}
+
+// ============ 그리기 ============
+function drawBoard() {
+  ctx.clearRect(0,0,SIZE,SIZE);
+
+  // 영역 배경 (강조 대상 영역 하이라이트)
+  for (let region = 0; region < 9; region++) {
+    const { row: r0, col: c0 } = rowColOf(region, 0);
+    const x = px(c0) - CELL*0.5 - 4;
+    const y = py(r0) - CELL*0.5 - 4;
+    const w = CELL*3 + 8;
+    const h = CELL*3 + 8;
+    const highlight = (requiredRegion === region);
+    ctx.fillStyle = highlight ? 'rgba(124,252,0,0.10)' : '#0a0f16';
+    ctx.strokeStyle = highlight ? '#7CFC00' : '#2a3a4a';
+    ctx.lineWidth = highlight ? 4 : 3;
+    roundRect(ctx, x, y, w, h, 10);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // 원형 칸
+  for (let row=0; row<9; row++) {
+    for (let col=0; col<9; col++) {
+      const x = px(col), y = py(row);
+      const color = board[row][col];
+      ctx.beginPath();
+      ctx.arc(x, y, CELL*0.36, 0, Math.PI*2);
+      if (color) {
+        ctx.fillStyle = COLOR_HEX[color];
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = '#182430';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#2a3a4a';
+        ctx.stroke();
+      }
+    }
+  }
+
+  if (winLine) {
+    const a = winLine[0], b = winLine[1];
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(px(a.col), py(a.row));
+    ctx.lineTo(px(b.col), py(b.row));
+    ctx.stroke();
+  }
+}
+
+function roundRect(ctx,x,y,w,h,r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+// ============ 좌표 변환 ============
+function pixelToCell(x,y) {
+  for (let row=0; row<9; row++) {
+    for (let col=0; col<9; col++) {
+      const dx = x-px(col), dy = y-py(row);
+      if (dx*dx+dy*dy <= (CELL*0.42)*(CELL*0.42)) return { row, col };
+    }
+  }
+  return null;
+}
+
+// ============ 게임 로직 ============
+function getLegalCells(region) {
+  const cells = [];
+  if (region === null) {
+    for (let row=0; row<9; row++) for (let col=0; col<9; col++) if (!board[row][col]) cells.push({row,col});
+    return cells;
+  }
+  for (let cellIdx=0; cellIdx<9; cellIdx++) {
+    const { row, col } = rowColOf(region, cellIdx);
+    if (!board[row][col]) cells.push({row,col});
+  }
+  return cells;
+}
+
+function checkWinAt(row,col,color) {
+  for (const [dr,dc] of DIRS4) {
+    let cells = [{row,col}];
+    let r=row+dr,c=col+dc;
+    while (inBoard(r,c) && board[r][c]===color) { cells.push({row:r,col:c}); r+=dr; c+=dc; }
+    r=row-dr; c=col-dc;
+    while (inBoard(r,c) && board[r][c]===color) { cells.unshift({row:r,col:c}); r-=dr; c-=dc; }
+    if (cells.length >= 3) {
+      return [cells[0], cells[cells.length-1]];
+    }
+  }
+  return null;
+}
+
+function isBoardFull() {
+  return board.every(row => row.every(v => v !== null));
+}
+
+// 살아있는 다음 플레이어를 찾고, 그 사람이 둘 곳이 없으면 탈락시키며 계속 진행.
+// 반환: {ok:true} 이번 턴 진행 가능 / {ok:false, winner} 게임 종료(최후 생존자 승리 또는 전멸)
+function resolveTurnOrElimination() {
+  while (true) {
+    const active = players.filter(p => !p.eliminated);
+    if (active.length <= 1) {
+      return { ok:false, winner: active.length === 1 ? active[0] : null };
+    }
+    // turnIndex가 탈락자를 가리키면 다음으로
+    while (players[turnIndex].eliminated) {
+      turnIndex = (turnIndex + 1) % players.length;
+    }
+    const legal = getLegalCells(requiredRegion);
+    if (legal.length > 0) {
+      return { ok:true };
+    }
+    // 이 플레이어는 둘 곳이 없음 -> 탈락
+    players[turnIndex].eliminated = true;
+    turnIndex = (turnIndex + 1) % players.length;
+  }
+}
+
+function updateStatus() {
+  if (!gameActive) return;
+  const cur = players[turnIndex];
+  const who = playerLabel(cur);
+  const regionText = requiredRegion === null ? '아무 곳' : `${requiredRegion+1}번 영역`;
+  statusEl.innerHTML = `<span style="color:${COLOR_HEX[cur.color]}">${who} (${COLOR_LABEL[cur.color]})</span> 차례 — ${regionText}에 두세요`;
+}
+
+function endGame(message) {
+  gameActive = false;
+  statusEl.innerHTML = message;
+}
+
+function placeStone(row, col) {
+  const cur = players[turnIndex];
+  board[row][col] = cur.color;
+
+  const win = checkWinAt(row, col, cur.color);
+  if (win) {
+    winLine = win;
+    drawBoard();
+    const who = playerLabel(cur);
+    endGame(`🎉 <span style="color:${COLOR_HEX[cur.color]}">${who} (${COLOR_LABEL[cur.color]})</span> 승리! 3개 연속 완성!`);
+    return;
+  }
+
+  if (isBoardFull()) {
+    drawBoard();
+    endGame('무승부! 보드가 가득 찼어요.');
+    return;
+  }
+
+  requiredRegion = cellIdxOf(row, col);
+  turnIndex = (turnIndex + 1) % players.length;
+
+  const result = resolveTurnOrElimination();
+  drawBoard();
+
+  if (!result.ok) {
+    if (result.winner) {
+      const who = playerLabel(result.winner);
+      endGame(`🏆 <span style="color:${COLOR_HEX[result.winner.color]}">${who} (${COLOR_LABEL[result.winner.color]})</span> 최후 생존! 나머지 전원 탈락으로 승리!`);
+    } else {
+      endGame('무승부! 아무도 더 이상 둘 수 없어요.');
+    }
+    return;
+  }
+
+  updateStatus();
+  maybeRunAI();
+}
+
+function maybeRunAI() {
+  if (!gameActive) return;
+  const cur = players[turnIndex];
+  if (cur.isHuman) return;
+  statusEl.innerHTML = `${playerLabel(cur)} 생각 중...`;
+  setTimeout(() => {
+    const move = chooseAIMove(cur);
+    if (move) placeStone(move.row, move.col);
+  }, 400);
+}
+
+// ============ 클릭 처리 ============
+canvas.addEventListener('click', (e) => {
+  if (!gameActive) return;
+  const cur = players[turnIndex];
+  if (!cur.isHuman) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = (e.clientX-rect.left) * (canvas.width/rect.width);
+  const y = (e.clientY-rect.top) * (canvas.height/rect.height);
+  const cell = pixelToCell(x,y);
+  if (!cell) return;
+  if (board[cell.row][cell.col]) return;
+
+  if (requiredRegion !== null && regionOf(cell.row, cell.col) !== requiredRegion) return;
+
+  placeStone(cell.row, cell.col);
+});
+
+// ============ 간단한 AI ============
+function lineScoreAt(row, col, color) {
+  let score = 0;
+  for (const [dr,dc] of DIRS4) {
+    let count = 1;
+    let openEnds = 0;
+    let r=row+dr, c=col+dc;
+    while (inBoard(r,c) && board[r][c]===color) { count++; r+=dr; c+=dc; }
+    if (inBoard(r,c) && !board[r][c]) openEnds++;
+    r=row-dr; c=col-dc;
+    while (inBoard(r,c) && board[r][c]===color) { count++; r-=dr; c-=dc; }
+    if (inBoard(r,c) && !board[r][c]) openEnds++;
+
+    if (count >= 3) score += 5000;
+    else if (count === 2) score += openEnds > 0 ? 120 : 15;
+    else score += 2;
+  }
+  return score;
+}
+
+function regionHasImmediateWinFor(region, color) {
+  for (let cellIdx=0; cellIdx<9; cellIdx++) {
+    const { row, col } = rowColOf(region, cellIdx);
+    if (board[row][col]) continue;
+    board[row][col] = color;
+    const win = checkWinAt(row, col, color);
+    board[row][col] = null;
+    if (win) return true;
+  }
+  return false;
+}
+
+function chooseAIMove(player) {
+  const legal = getLegalCells(requiredRegion);
+  if (legal.length === 0) return null;
+  const activeOthers = players.filter(p => !p.eliminated && p !== player);
+
+  // 1. 즉시 승리
+  for (const { row, col } of legal) {
+    board[row][col] = player.color;
+    const win = checkWinAt(row, col, player.color);
+    board[row][col] = null;
+    if (win) return { row, col };
+  }
+
+  // 2. 상대 즉시 승리 차단
+  for (const { row, col } of legal) {
+    for (const opp of activeOthers) {
+      board[row][col] = opp.color;
+      const win = checkWinAt(row, col, opp.color);
+      board[row][col] = null;
+      if (win) return { row, col };
+    }
+  }
+
+  // 3. 점수 기반 선택 (공격 + 방어 + 상대에게 승리 영역 넘기지 않기)
+  let best = -Infinity;
+  let bestMoves = [];
+  for (const { row, col } of legal) {
+    const offense = lineScoreAt(row, col, player.color);
+    let defense = 0;
+    for (const opp of activeOthers) {
+      defense = Math.max(defense, lineScoreAt(row, col, opp.color));
+    }
+    const sentRegion = cellIdxOf(row, col);
+    let penalty = 0;
+    for (const opp of activeOthers) {
+      if (regionHasImmediateWinFor(sentRegion, opp.color)) { penalty = 900; break; }
+    }
+    const score = offense + defense*0.9 - penalty;
+    if (score > best) { best = score; bestMoves = [{row,col}]; }
+    else if (score === best) { bestMoves.push({row,col}); }
+  }
+  return bestMoves[Math.floor(Math.random()*bestMoves.length)];
+}
+
+// ============ 이벤트 ============
+resetBtn.addEventListener('click', initGame);
+
+playerCountBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    playerCountBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    playerCount = Number(btn.dataset.count);
+    renderOrderButtons();
+    initGame();
+  });
+});
+
+colorBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    colorBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    myColor = btn.dataset.color;
+    initGame();
+  });
+});
+
+renderOrderButtons();
+initGame();
+</script>
+</body>
+</html>
