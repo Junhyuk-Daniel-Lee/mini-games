@@ -40,6 +40,20 @@
     transform: translateY(-8px);
   }
   .card .emoji { font-size: 80px; display: block; margin-bottom: 20px; }
+  .dotGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 8px;
+    width: 66px;
+    height: 66px;
+    margin: 0 auto;
+  }
+  .dotGrid span {
+    border-radius: 50%;
+    width: 100%;
+    height: 100%;
+  }
   .janggi-badge {
     display: inline-flex;
     align-items: center;
@@ -88,6 +102,15 @@
         <span class="janggi-badge" style="color:#2c6fbb">楚</span><span class="janggi-badge" style="color:#c0392b">漢</span>
       </span>
       장기
+    </a>
+    <a class="card" href="ultratictactoe/">
+      <span class="emoji">
+        <span class="dotGrid">
+          <span style="background:#ff5555"></span><span style="background:#4d90fe"></span>
+          <span style="background:#4caf50"></span><span style="background:#f1c40f"></span>
+        </span>
+      </span>
+      81 돌 게임
     </a>
     <!-- 다음 게임 추가 시 여기에 카드 추가 -->
   </div>
